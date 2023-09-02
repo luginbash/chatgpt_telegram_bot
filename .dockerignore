@@ -1,2 +1,5 @@
 mongodb
-  
+
+.git/
+.env
+*.env
