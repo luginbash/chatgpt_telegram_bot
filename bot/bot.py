@@ -1,15 +1,14 @@
-import os
-import logging
 import asyncio
-import traceback
 import html
 import json
+import logging
 import tempfile
-import pydub
-from pathlib import Path
+import traceback
 from datetime import datetime
-import openai
+from pathlib import Path
 
+import openai
+import pydub
 import telegram
 from telegram import (
     Update,
@@ -18,6 +17,7 @@ from telegram import (
     InlineKeyboardMarkup,
     BotCommand,
 )
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -28,12 +28,10 @@ from telegram.ext import (
     AIORateLimiter,
     filters,
 )
-from telegram.constants import ParseMode, ChatAction
 
 import config
 import database
 import openai_utils
-
 
 # setup
 db = database.Database()
@@ -69,11 +67,11 @@ For example: "{bot_username} write a poem about Telegram"
 
 def split_text_into_chunks(text, chunk_size):
     for i in range(0, len(text), chunk_size):
-        yield text[i : i + chunk_size]
+        yield text[i: i + chunk_size]
 
 
 async def register_user_if_not_exists(
-    update: Update, context: CallbackContext, user: User
+        update: Update, context: CallbackContext, user: User
 ):
     if not db.check_if_user_exists(user.id):
         db.add_new_user(
@@ -191,7 +189,7 @@ async def retry_handle(update: Update, context: CallbackContext):
 
 
 async def message_handle(
-    update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True
+        update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True
 ):
     # check if bot was mentioned (for group chats)
     if not await is_bot_mentioned(update, context):
@@ -223,7 +221,7 @@ async def message_handle(
         # new dialog timeout
         if use_new_dialog_timeout:
             if (
-                datetime.now() - db.get_user_attribute(user_id, "last_interaction")
+                    datetime.now() - db.get_user_attribute(user_id, "last_interaction")
             ).seconds > config.new_dialog_timeout and len(
                 db.get_dialog_messages(user_id)
             ) > 0:
@@ -370,7 +368,7 @@ async def message_handle(
 
 
 async def is_previous_message_not_answered_yet(
-    update: Update, context: CallbackContext
+        update: Update, context: CallbackContext
 ):
     await register_user_if_not_exists(update, context, update.message.from_user)
 
@@ -433,6 +431,17 @@ async def voice_message_handle(update: Update, context: CallbackContext):
     await message_handle(update, context, message=transcribed_text)
 
 
+async def audio_message_handle(update: Update, context: CallbackContext):
+    if not await is_bot_mentioned(update, context):
+        return
+
+    await register_user_if_not_exists(update, context, update.message.from_user)
+    if await is_previous_message_not_answered_yet(update, context):
+        return
+
+    audio = update.message.audio
+
+
 async def generate_image_handle(update: Update, context: CallbackContext, message=None):
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context):
@@ -451,7 +460,7 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
         )
     except openai.error.InvalidRequestError as e:
         if str(e).startswith(
-            "Your request was rejected as a result of our safety system"
+                "Your request was rejected as a result of our safety system"
         ):
             text = "🥲 Your request <b>doesn't comply</b> with OpenAI's usage policies.\nWhat did you write there, huh?"
             await update.message.reply_text(text, parse_mode=ParseMode.HTML)
@@ -511,8 +520,8 @@ def get_chat_mode_menu(page_index: int):
     # buttons
     chat_mode_keys = list(config.chat_modes.keys())
     page_chat_mode_keys = chat_mode_keys[
-        page_index * n_chat_modes_per_page : (page_index + 1) * n_chat_modes_per_page
-    ]
+                          page_index * n_chat_modes_per_page: (page_index + 1) * n_chat_modes_per_page
+                          ]
 
     keyboard = []
     for chat_mode_key in page_chat_mode_keys:
@@ -707,18 +716,18 @@ async def show_balance_handle(update: Update, context: CallbackContext):
         total_n_used_tokens += n_input_tokens + n_output_tokens
 
         n_input_spent_dollars = config.models["info"][model_key][
-            "price_per_1000_input_tokens"
-        ] * (n_input_tokens / 1000)
+                                    "price_per_1000_input_tokens"
+                                ] * (n_input_tokens / 1000)
         n_output_spent_dollars = config.models["info"][model_key][
-            "price_per_1000_output_tokens"
-        ] * (n_output_tokens / 1000)
+                                     "price_per_1000_output_tokens"
+                                 ] * (n_output_tokens / 1000)
         total_n_spent_dollars += n_input_spent_dollars + n_output_spent_dollars
 
         details_text += f"- {model_key}: <b>{n_input_spent_dollars + n_output_spent_dollars:.03f}$</b> / <b>{n_input_tokens + n_output_tokens} tokens</b>\n"
 
     # image generation
     image_generation_n_spent_dollars = (
-        config.models["info"]["dalle-2"]["price_per_1_image"] * n_generated_images
+            config.models["info"]["dalle-2"]["price_per_1_image"] * n_generated_images
     )
     if n_generated_images != 0:
         details_text += f"- DALL·E 2 (image generation): <b>{image_generation_n_spent_dollars:.03f}$</b> / <b>{n_generated_images} generated images</b>\n"
@@ -727,8 +736,8 @@ async def show_balance_handle(update: Update, context: CallbackContext):
 
     # voice recognition
     voice_recognition_n_spent_dollars = config.models["info"]["whisper"][
-        "price_per_1_min"
-    ] * (n_transcribed_seconds / 60)
+                                            "price_per_1_min"
+                                        ] * (n_transcribed_seconds / 60)
     if n_transcribed_seconds != 0:
         details_text += f"- Whisper (voice recognition): <b>{voice_recognition_n_spent_dollars:.03f}$</b> / <b>{n_transcribed_seconds:.01f} seconds</b>\n"
 
@@ -813,9 +822,9 @@ def run_bot() -> None:
         user_ids = [x for x in any_ids if x > 0]
         group_ids = [x for x in any_ids if x < 0]
         user_filter = (
-            filters.User(username=usernames)
-            | filters.User(user_id=user_ids)
-            | filters.Chat(chat_id=group_ids)
+                filters.User(username=usernames)
+                | filters.User(user_id=user_ids)
+                | filters.Chat(chat_id=group_ids)
         )
 
     application.add_handler(CommandHandler("start", start_handle, filters=user_filter))
